@@ -11,40 +11,35 @@ import (
 	"os"
 	"time"
 
+	pb "GoExercise/server/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "DistGrep/server/utils"
 )
 
 const (
-	port = ":50051" //for client side -> server behaviour
-	address = "localhost:50052" //for worker side -> client behaviour
+	port       = ":50051"          //for client side -> server behaviour
+	address    = "localhost:50052" //for worker side -> client behaviour
 	numWorkers = 5
 )
 
 type masterServer struct {
-	Workers      []Worker
-	numWorkers   int
-	filepath string
+	Workers    []Worker
+	numWorkers int
+	filepath   string
 	rpc.UnimplementedMasterServer
 }
 
-
-
 //gRPC - client side - function
-
 
 //gRPC - worker side - function
 
 func (ms *masterServer) Grep(ctx context.Context, in *pb.FileChunk) (*pb.GrepRow, error) {
 	chunks := getChunks(ms.filepath)
 
-	//open chunks
-	for i := 0; i < ms.numWorkers; i++ {
-		c, err := os.Open(chunks[i])
-		errorHandler(err)
-	}
+	//SEND CHUNKS TO WORKERS
+
+	//RECEIVE STRINGS
 }
 
 //local functions
@@ -74,14 +69,14 @@ func getChunks(srcName string) []string {
 			count++
 
 			//chunk complete: append
-			if count == linesPerWorker{
+			if count == linesPerWorker {
 				file.Close()
 				chunkNames = append(chunkNames, name)
 				break
 			}
 
 			//scanner error
-			err:= scanner.Err()
+			err := scanner.Err()
 			errorHandler(err)
 		}
 	}
@@ -97,13 +92,13 @@ func lineCounter(file *os.File) int {
 		count++
 	}
 
-	err:= scanner.Err()
+	err := scanner.Err()
 	errorHandler(err)
 
 	return count
 }
 
-	//error handling
+//error handling
 func errorHandler(err error) {
 	if err != nil {
 		log.Fatalf("failure: %v", err)

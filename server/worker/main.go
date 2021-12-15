@@ -2,52 +2,63 @@ package worker
 
 import (
 	"bufio"
-	"fmt"
+	"context"
 	"io"
+	"log"
+	"net"
+	"net/rpc"
 	"os"
-	"strconv"
 	"strings"
+
+	pb "GoExercise/server/utils"
+	"google.golang.org/grpc"
 )
 
 const (
-
+	port = ":50052" //for master side -> server behaviour
 )
 
-func findPattern(file *os.File, pattern string) bool {
+type workerServer struct {
+	id uint
+	rpc.UnimplementedMasterServer
+}
+
+func (ws *workerServer) Grep(ctx context.Context, in *pb.FileChunk) (*pb.GrepRow, error) {
+	//TODO
+}
+
+func findPattern(file *os.File, pattern string) string {
 	fileReader := bufio.NewReader(file)
-	lines := 0
-	lineIdx := 0
 
 	for {
 		line, err := fileReader.ReadString('\n')
-		lineIdx++
-		if lineIdx == 1 {
-			fmt.Println(DELIMETER)
+		if err != nil && err == io.EOF {
+			//SEND DONE TO MASTER
 		}
-		if strings.Contains(line, pattern) {
-			founded := fmt.Sprintf("%s[%s]: %s", color.GreenString(file.Name()), color.GreenString(strconv.Itoa(lineIdx)), strings.ReplaceAll(line, pattern, color.New(color.Underline).Add(color.FgGreen).Sprintf("%s", pattern)))
-			fmt.Println(founded + DELIMETER)
 
-			lines++
-			continue
-		}
-		if err == io.EOF {
-			return lines > 0
+		if strings.Contains(line, pattern) {
+			//SEND STRING TO MASTER
 		}
 	}
 }
 
+//error handling
+func errorHandler(err error) {
+	if err != nil {
+		log.Fatalf("failure: %v", err)
+	}
+}
+
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println(color.CyanString("Usage: "), color.HiGreenString("ggrep [d] pattern filename1 filename2 filename3"))
-		fmt.Println(color.CyanString("d"), color.HiGreenString(" - find in directories"))
-		return
-	}
-	isDir := os.Args[1] == "d"
-	if isDir {
-		findInDir(os.Args[2], os.Args[3:])
-		fmt.Println(isDir)
-	} else {
-		find(os.Args[1], os.Args[2:])
-	}
+	// Add server listener
+	lis, err := net.Listen("tcp", port)
+	errorHandler(err)
+
+	// Start and register the server
+	w := grpc.NewServer()
+	pb.RegisterGrepMapReduceServer(w, &workerServer{})
+	log.Printf("server listening at %v", lis.Addr())
+
+	err = w.Serve(lis)
+	errorHandler(err)
 }
