@@ -1,0 +1,21 @@
+syntax = "proto3";
+option go_package = "server/utils";
+package utils;
+
+service MapReduce {
+  rpc Grep(FileChunk) returns (stream GrepRow) {}
+}
+
+message FileChunk {
+  string filename = 1;
+  bytes content = 2;
+  int32 chunk_num = 3;
+  string regex = 4;
+}
+
+message GrepRow {
+  string row = 1;
+  int32 seq_num = 2;
+  bool done = 3;
+}
+
