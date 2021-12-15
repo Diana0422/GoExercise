@@ -16,8 +16,9 @@ type masterServer struct {
 	pb.UnimplementedGrepMapReduceServer
 }
 
-func (m *masterServer) Grep(ctx context.Context, in *pb.File) (*pb.File, error) {
-	// TODO implement
+func (m *masterServer) Grep(ctx context.Context, file *pb.File) (*pb.File, error) {
+	log.Printf("Received: %v", file.GetFileName())
+	return &pb.File{FileName: "test.txt", FileContent: "test_content"}, nil
 }
 
 func main() {
@@ -28,11 +29,10 @@ func main() {
 	}
 
 	// Start and register the server
-	m = grpc.NewServer()
+	m := grpc.NewServer()
 	pb.RegisterGrepMapReduceServer(m, &masterServer{})
 	log.Printf("server listening at %v", lis.Addr())
 	if err := m.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
-
 }
