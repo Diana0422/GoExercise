@@ -1,40 +1,45 @@
 package client
 
 import (
-	pb "GoExercise/go_exercise"
-	"context"
-	"flag"
 	"fmt"
-	"google.golang.org/grpc"
 	"io/ioutil"
 	"log"
+	"net/rpc"
 	"os"
 )
 
-var (
-	serverAddr = flag.String("server_addr", "localhost:50051", "The server address in the format of host:port")
+type File struct {
+	name    string
+	content string
+}
+
+const (
+	network  = "tcp"
+	address  = "localhost:1234"
+	service1 = "MasterServer.Grep"
 )
 
+/*------------------ MAIN -------------------------------------------------------*/
 func main() {
-	//dial with the server
-	conn, err := grpc.Dial(*serverAddr)
-	if err != nil {
-		log.Fatalf("failed to dial: #{err}")
-	}
-	defer conn.Close()
-	cli := pb.NewGrepMapReduceClient(conn)
+	var reply File
+
+	//create a TCP connection to localhost on port 1234
+	cli, err := rpc.DialHTTP(network, address)
+	errorHandler(err)
 
 	// retrieve file to grep TODO better
 	filename := "test.txt"
-	content := readFileContent(filename)
+	file := new(File)
+	file.name = filename
+	file.content = readFileContent(filename)
+
 	// request to grep file to the server
-	grep, err := cli.Grep(context.Background(), &pb.File{FileName: filename, FileContent: content})
-	if err != nil {
-		log.Fatalf("failed to grep file: #{err}")
-	}
-	log.Println(grep)
+	err = cli.Call(service1, file, &reply)
+	errorHandler(err)
+	log.Println(reply)
 }
 
+/*------------------ OTHER FUNCTIONS -------------------------------------------------------*/
 func readFileContent(filename string) string {
 	//open file
 	f, err := os.Open(filename)
@@ -50,4 +55,10 @@ func readFileContent(filename string) string {
 	}
 	fmt.Println(string(content))
 	return string(content)
+}
+
+func errorHandler(err error) {
+	if err != nil {
+		log.Fatalf("failure: %v", err)
+	}
 }
