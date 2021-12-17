@@ -1,7 +1,8 @@
-package master
+package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -17,25 +18,32 @@ const (
 )
 
 type File struct {
-	name    string
-	content string
+	Name    string
+	Content string
 }
 
 type MasterServer struct {
-	Workers    []Worker
+	//Workers    []Worker
 	numWorkers int
 	filepath   string
 }
 
 // Grep /*---------- REMOTE PROCEDURE - CLIENT SIDE ---------------------------------------*/
-func (m *MasterServer) Grep(payload File, reply *File) error {
-	log.Printf("Received: %v", getFileName(payload))
+func (m *MasterServer) Grep(payload []byte, reply *File) error {
+	log.Printf("Received: %v", payload)
+	var file File
+
+	// Unmarshalling
+	err := json.Unmarshal(payload, &file)
+	errorHandler(err)
+	log.Printf("Unmarshal: Name: %s, Content: %s", file.Name, file.Content)
 
 	// chunk the file using getChunks function
 	var chunks []string
-	chunks = getChunks(payload.name)
+	chunks = getChunks(file.Name)
 
 	log.Println(chunks) // just for now
+	*reply = file       // just for now
 	// TODO spawn workers (n_workers)
 	// TODO call worker's remote procedure to handle the mapping
 	return nil
@@ -128,5 +136,5 @@ func errorHandler(err error) {
 
 // Get a file name
 func getFileName(file File) string {
-	return file.name
+	return file.Name
 }
