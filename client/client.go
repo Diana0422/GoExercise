@@ -9,6 +9,11 @@ import (
 	"os"
 )
 
+type GrepArgs struct {
+	File  File
+	Regex string
+}
+
 type File struct {
 	Name    string
 	Content string
@@ -18,6 +23,9 @@ const (
 	network  = "tcp"
 	address  = "localhost:1234"
 	service1 = "MasterServer.Grep"
+
+	filename = "client/test.txt"
+	regex    = "ciao"
 )
 
 /*------------------ MAIN -------------------------------------------------------*/
@@ -28,22 +36,32 @@ func main() {
 	cli, err := rpc.DialHTTP(network, address)
 	errorHandler(err)
 
+	mArgs := prepareArguments(filename, regex)
+
+	// request to grep file to the server
+	err = cli.Call(service1, mArgs, &reply)
+	errorHandler(err)
+
+	log.Println(reply)
+}
+
+func prepareArguments(f string, r string) interface{} {
 	// retrieve file to grep TODO better: choose your file
-	filename := "client/test.txt"
 	file := new(File)
 	file.Name = filename
 	file.Content = readFileContent(filename)
 	log.Printf("File Content: %s", file.Content)
 
+	grepArgs := new(GrepArgs)
+	grepArgs.File = *file
+	grepArgs.Regex = regex
+
 	// Marshaling
-	s, err := json.Marshal(&file)
+	s, err := json.Marshal(&grepArgs)
 	errorHandler(err)
 	log.Printf("Marshaled Data: %s", s)
 
-	// request to grep file to the server
-	err = cli.Call(service1, s, &reply)
-	errorHandler(err)
-	log.Println(reply)
+	return s
 }
 
 /*------------------ OTHER FUNCTIONS -------------------------------------------------------*/

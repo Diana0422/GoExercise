@@ -1,9 +1,12 @@
 package main
 
 import (
+	"GoExercise/server/worker"
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -12,44 +15,76 @@ import (
 )
 
 const (
-	network    = "tcp"
-	address    = "localhost:1234"
+	network = "tcp"
+	addressLocal = "localhost:1234"
+	address = "localhost:5678"
+	service2 = "Worker.Grep"
 	numWorkers = 5
 )
 
+type GrepRequest struct{
+	File File
+	Regex string
+}
+
 type File struct {
 	Name    string
-	Content string
+	Content []byte
 }
 
 type MasterServer struct {
-	//Workers    []Worker
-	numWorkers int
 	filepath   string
+	regex string
+}
+
+type MasterClient struct{
+	Workers    []worker.Worker
+	currWorkers int
 }
 
 // Grep /*---------- REMOTE PROCEDURE - CLIENT SIDE ---------------------------------------*/
 func (m *MasterServer) Grep(payload []byte, reply *File) error {
 	log.Printf("Received: %v", payload)
-	var file File
+	var inArgs GrepRequest
 
 	// Unmarshalling
-	err := json.Unmarshal(payload, &file)
+	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err)
-	log.Printf("Unmarshal: Name: %s, Content: %s", file.Name, file.Content)
+	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
+		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
-	// chunk the file using getChunks function
-	var chunks []string
-	chunks = getChunks(file.Name)
+	master := new(MasterClient)
+	master.Grep(inArgs.File, inArgs.Regex)
 
-	log.Println(chunks) // just for now
-	*reply = file       // just for now
-	// TODO spawn workers (n_workers)
-	// TODO call worker's remote procedure to handle the mapping
 	return nil
 }
 
 // Grep /*---------- REMOTE PROCEDURE - WORKER SIDE ---------------------------------------*/
+func (mc *MasterClient) Grep(srcFile File, regex string) (*pb.GrepRow, error) {
+	// chunk the file using getChunks function
+	var chunks []File
+	chunks = getChunks(srcFile)
+	log.Println(chunks) // just for now
+
+	//prepare results
+	grepResp := [numWorkers]worker.GrepResp{}
+
+	//SEND CHUNKS TO WORKERS
+	for i,chunk := range chunks {
+		//create a TCP connection to localhost on port 5678
+		cli, err := rpc.DialHTTP(network, address)
+		errorHandler(err)
+
+		mArgs := prepareArguments(chunk, regex)
+
+		//spawn worker connections
+		worker := new(worker.Worker)
+		grep := cli.Go(service2, mArgs, worker, nil)
+
+		//wait for response
+		grepResp[i] := <-grep.Done
+	}
+}
 
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
@@ -61,7 +96,7 @@ func main() {
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 1234
-	listener, err := net.Listen(network, address)
+	listener, err := net.Listen(network, addressLocal)
 	errorHandler(err)
 	log.Printf("Serving RPC server on port %d", 1234)
 
@@ -72,35 +107,30 @@ func main() {
 }
 
 /*------------------ LOCAL FUNCTIONS -------------------------------------------------------*/
-func getChunks(srcName string) []string {
+func getChunks(srcFile File) []File {
 	//retrieve number of lines per worker
-	srcFile, err := os.Open(srcName)
-	errorHandler(err)
-
 	numLines := lineCounter(srcFile)
 	linesPerWorker := numLines / numWorkers
 
 	//create chunk buffer
-	chunkNames := make([]string, numWorkers)
-	scanner := bufio.NewScanner(srcFile)
+	chunks := make([]File, numWorkers)
+	scanner := bufio.NewScanner(bytes.NewReader(srcFile.Content))
 
 	for i := 0; i < numWorkers; i++ {
 		//create and open with append mode a new chunk
-		name := "chunk" + string(i) + ".txt"
-		file, err := os.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		errorHandler(err)
+		chunk := new(File)
+		chunk.Name = "chunk" + string(i) + ".txt"
 
 		//write 'linesPerWorker' lines from src to chunk
 		count := 0
 		for scanner.Scan() {
-			_, err = fmt.Fprintln(file, scanner)
-			errorHandler(err)
+			chunk.Content = append(chunk.Content, scanner.Bytes()...)
+			chunk.Content = append(chunk.Content, "\n"...)
 			count++
 
 			//chunk complete: append
 			if count == linesPerWorker {
-				file.Close()
-				chunkNames = append(chunkNames, name)
+				chunks = append(chunks, *chunk)
 				break
 			}
 
@@ -110,12 +140,13 @@ func getChunks(srcName string) []string {
 		}
 	}
 
-	return chunkNames
+	return chunks
 }
 
 //count number of lines in a file
-func lineCounter(file *os.File) int {
-	scanner := bufio.NewScanner(file)
+func lineCounter(file File) int {
+	scanner := bufio.NewScanner(bytes.NewReader(file.Content))
+
 	count := 0
 	for scanner.Scan() {
 		count++
@@ -125,6 +156,37 @@ func lineCounter(file *os.File) int {
 	errorHandler(err)
 
 	return count
+}
+
+func prepareArguments(chunk File, regex string) interface{} {
+	// Arguments
+	grepArgs := new(GrepRequest)
+	grepArgs.Regex = regex
+	grepArgs.File = chunk
+
+	// Marshaling
+	mArgs, err := json.Marshal(&grepArgs)
+	errorHandler(err)
+	log.Printf("Marshaled Data: %s", mArgs)
+
+	return mArgs
+}
+
+func readFileContent(filename string) []byte {
+	//open file
+	f, err := os.Open(filename)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(f.Stat())
+
+	//read file content
+	log.Printf("Reading file: %s", filename)
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		fmt.Println("failed to read file: #{err}")
+	}
+	return content
 }
 
 //error handling
