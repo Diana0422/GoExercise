@@ -25,7 +25,7 @@ const (
 	service1 = "MasterServer.Grep"
 
 	filename = "client/test.txt"
-	regex    = "ciao"
+	regex    = "is"
 )
 
 /*------------------ MAIN -------------------------------------------------------*/
@@ -48,13 +48,13 @@ func main() {
 func prepareArguments(f string, r string) interface{} {
 	// retrieve file to grep TODO better: choose your file
 	file := new(File)
-	file.Name = filename
-	file.Content = readFileContent(filename)
+	file.Name = f
+	file.Content = readFileContent(f)
 	log.Printf("File Content: %s", file.Content)
 
 	grepArgs := new(GrepArgs)
 	grepArgs.File = *file
-	grepArgs.Regex = regex
+	grepArgs.Regex = r
 
 	// Marshaling
 	s, err := json.Marshal(&grepArgs)

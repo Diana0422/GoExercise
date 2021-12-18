@@ -1,8 +1,6 @@
-package worker
+package main
 
 import (
-	"bufio"
-	"bytes"
 	"container/list"
 	"encoding/json"
 	"log"
@@ -24,7 +22,7 @@ type GrepArgs struct {
 
 type File struct {
 	Name    string
-	Content []byte
+	Content string
 }
 
 type MapResp struct {
@@ -35,46 +33,21 @@ type MapResp struct {
 type Worker int
 
 // Grep /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
-func (w *Worker) Grep(payload []byte) (*list.List, error) {
+func (w *Worker) Grep(payload []byte, mapRes *list.List) error {
 
-	log.Printf("Received: %v", payload)
+	log.Printf("Received: %v", string(payload))
 	var inArgs GrepArgs
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err)
+
 	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
 		inArgs.Chunk.Name, inArgs.Chunk.Content, inArgs.Regex)
 
-	mapRes := mapGrep(inArgs.Chunk, inArgs.Regex)
+	mapRes = mapGrep(inArgs.Chunk, inArgs.Regex)
 
-	return mapRes, nil
-}
-
-// MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
-func mapGrep(chunk File, regex string) *list.List {
-
-	res := new(list.List)
-	scanner := bufio.NewScanner(bytes.NewReader(chunk.Content))
-
-	for scanner.Scan() {
-		if strings.Contains(regex, scanner.Text()) {
-			res.PushBack(MapResp{scanner.Text(), true})
-		}
-
-		//scanner error
-		err := scanner.Err()
-		errorHandler(err)
-	}
-
-	return res
-}
-
-//error handling
-func errorHandler(err error) {
-	if err != nil {
-		log.Fatalf("failure: %v", err)
-	}
+	return nil
 }
 
 /*------------------ MAIN -------------------------------------------------------*/
@@ -93,4 +66,26 @@ func main() {
 
 	err = http.Serve(listener, nil)
 	errorHandler(err)
+}
+
+// MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
+func mapGrep(chunk File, regex string) *list.List {
+
+	res := new(list.List)
+	lines := strings.Split(chunk.Content, "\n")
+
+	for _, line := range lines {
+		if strings.Contains(regex, line) {
+			res.PushBack(MapResp{line, true})
+		}
+	}
+
+	return res
+}
+
+//error handling
+func errorHandler(err error) {
+	if err != nil {
+		log.Fatalf("failure: %v", err)
+	}
 }
