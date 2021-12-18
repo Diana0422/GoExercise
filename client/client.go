@@ -11,9 +11,9 @@ import (
 	"strconv"
 )
 
-type GrepArgs struct {
-	File  File
-	Regex string
+type GrepRequest struct {
+	ArgFile File
+	Regex   string
 }
 
 type File struct {
@@ -32,22 +32,23 @@ const (
 
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
-	var reply File
+	reply := new(File)
 	var cli *rpc.Client
+	var err error
 
 	// check for open TCP ports
 	for p := 50000; p <= 50005; p++ {
 		port := strconv.Itoa(p)
-		cli, err := rpc.Dial(network, net.JoinHostPort(address, port))
+		cli, err = rpc.Dial(network, net.JoinHostPort(address, port))
 		if err != nil {
 			log.Printf("Connection error: port %v is not active", p)
 			continue
 		}
 		if cli != nil {
 			//create a TCP connection to localhost
-			defer cli.Close()
 			net.JoinHostPort(address, port)
 			log.Printf("Connected on port %v", p)
+			log.Printf("client conn: %p", cli)
 			break
 		}
 	}
@@ -56,28 +57,31 @@ func main() {
 	mArgs := prepareArguments(filename, regex)
 	fmt.Println(mArgs)
 	// request to grep file to the server
+	log.Printf("service: %v", service1)
+	log.Printf("args: %v", mArgs)
+	log.Printf("reply: %p", &reply)
+	log.Printf("client: %p", cli)
 	cliCall := cli.Go(service1, mArgs, &reply, nil)
 	repCall := <-cliCall.Done
-	if repCall != nil {
-		log.Println("Done")
-	}
+	log.Printf("Done %v", repCall)
 
 	log.Println(reply)
+	cli.Close()
 }
 
-func prepareArguments(f string, r string) interface{} {
+func prepareArguments(f string, r string) []byte {
 	// retrieve file to grep TODO better: choose your file
 	file := new(File)
 	file.Name = filename
 	file.Content = readFileContent(filename)
 	log.Printf("File Content: %s", file.Content)
 
-	grepArgs := new(GrepArgs)
-	grepArgs.File = *file
-	grepArgs.Regex = regex
+	grepRequest := new(GrepRequest)
+	grepRequest.ArgFile = *file
+	grepRequest.Regex = regex
 
 	// Marshaling
-	s, err := json.Marshal(&grepArgs)
+	s, err := json.Marshal(&grepRequest)
 	errorHandler(err)
 	log.Printf("Marshaled Data: %s", s)
 

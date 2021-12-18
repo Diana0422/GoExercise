@@ -10,7 +10,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"strconv"
@@ -28,8 +27,8 @@ const (
 var port string
 
 type GrepRequest struct {
-	File  File
-	Regex string
+	ArgFile File
+	Regex   string
 }
 
 type File struct {
@@ -55,8 +54,7 @@ func (m *MasterServer) Grep(payload []byte, reply *File) error {
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err)
-	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
-		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.ArgFile.Name, inArgs.ArgFile.Content, inArgs.Regex)
 
 	//master := new(MasterClient)
 	//master.Grep(inArgs.File, inArgs.Regex)
@@ -103,11 +101,11 @@ func main() {
 
 	go serveClients()
 
-	/*master := new(MasterServer)
+	master := new(MasterServer)
 	// Publish the receiver methods
 	err := rpc.Register(master)
 	errorHandler(err)
-	go serveClients()*/
+
 	for {
 	}
 }
@@ -123,14 +121,9 @@ func serveClients() {
 	errorHandler(err)
 	log.Printf("Serving RPC server on address %s , port %s", addr, port)
 
-	// create new listener
-	//listener := new(net.Listener)
-	//rpc.Register(listener)
-	//log.Printf("Create new listener")
-
 	for {
 		// serve the new client
-		err = http.Serve(listen, nil)
+		rpc.Accept(listen)
 		log.Printf("Serving the client.")
 		errorHandler(err)
 	}
@@ -192,7 +185,7 @@ func prepareArguments(chunk File, regex string) interface{} {
 	// Arguments
 	grepArgs := new(GrepRequest)
 	grepArgs.Regex = regex
-	grepArgs.File = chunk
+	grepArgs.ArgFile = chunk
 
 	// Marshaling
 	mArgs, err := json.Marshal(&grepArgs)
