@@ -1,7 +1,7 @@
 # GoExercise
 ![alt text](golang_icon_no_bg.png)
 
-##Running:
+## Running:
 If the file **go.mod** is not in the repository **GoExercise**, then:
 * Set the modules of the repository:
 ````
