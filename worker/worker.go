@@ -40,7 +40,7 @@ func (w *Worker) Grep(payload []byte, mapRes *list.List) error {
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
-	errorHandler(err)
+	errorHandler(err, 42)
 
 	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
 		inArgs.Chunk.Name, inArgs.Chunk.Content, inArgs.Regex)
@@ -55,17 +55,17 @@ func main() {
 	worker := new(Worker)
 	// Publish the receiver methods
 	err := rpc.Register(worker)
-	errorHandler(err)
+	errorHandler(err, 57)
 
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 5678
 	listener, err := net.Listen(network, addressLocal)
-	errorHandler(err)
+	errorHandler(err, 63)
 	log.Printf("Serving RPC server on port %d", 5678)
 
 	err = http.Serve(listener, nil)
-	errorHandler(err)
+	errorHandler(err, 67)
 }
 
 // MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
@@ -84,8 +84,8 @@ func mapGrep(chunk File, regex string) *list.List {
 }
 
 //error handling
-func errorHandler(err error) {
+func errorHandler(err error, line int) {
 	if err != nil {
-		log.Fatalf("failure: %v", err)
+		log.Fatalf("failure at line %d: %v", line, err)
 	}
 }

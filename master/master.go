@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net"
-	"net/http"
 	"net/rpc"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -17,6 +18,8 @@ const (
 	service2     = "Worker.Grep"
 	maxLoad      = 10 //every worker operates on a maximum of 'maxLoad' lines
 )
+
+var port string
 
 type GrepResp struct {
 	Key   string
@@ -46,7 +49,7 @@ func (m *MasterServer) Grep(payload []byte, reply *File) error {
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
-	errorHandler(err)
+	errorHandler(err, 51)
 
 	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
 		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
@@ -72,7 +75,7 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 	for i, chunk := range chunks {
 		//create a TCP connection to localhost on port 5678
 		cli, err := rpc.DialHTTP(network, address)
-		errorHandler(err)
+		errorHandler(err, 77)
 
 		mArgs := prepareArguments(chunk, regex)
 
@@ -92,21 +95,41 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
+	// Generate a random port for the client
+	rand.Seed(time.Now().UTC().UnixNano())
+	max := 50005
+	min := 50000
+
+	portNum := rand.Intn(max-min) + min
+	port = strconv.Itoa(portNum)
+
+	go serveClients()
+
 	master := new(MasterServer)
 	// Publish the receiver methods
 	err := rpc.Register(master)
-	errorHandler(err)
+	errorHandler(err, 110)
+
+	for {
+	}
+}
+
+func serveClients() {
+	addr, err := net.ResolveTCPAddr(network, "0.0.0.0:"+port)
+	errorHandler(err, 117)
 
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 1234
-	listener, err := net.Listen(network, addressLocal)
-	errorHandler(err)
-	log.Printf("Serving RPC server on port %d", 1234)
+	listen, err := net.ListenTCP(network, addr)
+	errorHandler(err, 123)
+	log.Printf("Serving RPC server on address %s , port %s", addr, port)
 
-	// serve the client TODO multiple clients
-	err = http.Serve(listener, nil)
-	errorHandler(err)
+	for {
+		// serve the new client
+		rpc.Accept(listen)
+		log.Printf("Serving the client.")
+	}
 }
 
 /*------------------ LOCAL FUNCTIONS -------------------------------------------------------*/
@@ -160,7 +183,7 @@ func prepareArguments(chunk File, regex string) interface{} {
 
 	// Marshaling
 	mArgs, err := json.Marshal(&grepArgs)
-	errorHandler(err)
+	errorHandler(err, 185)
 	log.Printf("Marshaled Data: %s", mArgs)
 
 	return mArgs
@@ -178,8 +201,8 @@ func mergeMapResults(resp []GrepResp) (*File, error) {
 }
 
 //error handling
-func errorHandler(err error) {
+func errorHandler(err error, line int) {
 	if err != nil {
-		log.Fatalf("failure: %v", err)
+		log.Fatalf("failure at line %d: %v", line, err)
 	}
 }
