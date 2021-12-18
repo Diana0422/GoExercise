@@ -8,22 +8,27 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
+	"strconv"
+	"time"
 )
 
 const (
-	network = "tcp"
+	network      = "tcp"
 	addressLocal = "localhost:1234"
-	address = "localhost:5678"
-	service2 = "Worker.Grep"
-	numWorkers = 5
+	address      = "localhost:5678"
+	service2     = "Worker.Grep"
+	numWorkers   = 5
 )
 
-type GrepRequest struct{
-	File File
+var port string
+
+type GrepRequest struct {
+	File  File
 	Regex string
 }
 
@@ -33,18 +38,18 @@ type File struct {
 }
 
 type MasterServer struct {
-	filepath   string
-	regex string
+	filepath string
+	regex    string
 }
 
-type MasterClient struct{
-	Workers    []worker.Worker
+type MasterClient struct {
+	Workers     []worker.Worker
 	currWorkers int
 }
 
 // Grep /*---------- REMOTE PROCEDURE - CLIENT SIDE ---------------------------------------*/
 func (m *MasterServer) Grep(payload []byte, reply *File) error {
-	log.Printf("Received: %v", payload)
+	log.Printf("Received: %s", payload)
 	var inArgs GrepRequest
 
 	// Unmarshalling
@@ -53,14 +58,14 @@ func (m *MasterServer) Grep(payload []byte, reply *File) error {
 	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
 		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
-	master := new(MasterClient)
-	master.Grep(inArgs.File, inArgs.Regex)
+	//master := new(MasterClient)
+	//master.Grep(inArgs.File, inArgs.Regex)
 
 	return nil
 }
 
 // Grep /*---------- REMOTE PROCEDURE - WORKER SIDE ---------------------------------------*/
-func (mc *MasterClient) Grep(srcFile File, regex string) (*pb.GrepRow, error) {
+/*func (mc *MasterClient) Grep(srcFile File, regex string) (*pb.GrepRow, error) {
 	// chunk the file using getChunks function
 	var chunks []File
 	chunks = getChunks(srcFile)
@@ -84,26 +89,51 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*pb.GrepRow, error) {
 		//wait for response
 		grepResp[i] := <-grep.Done
 	}
-}
+}*/
 
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
-	master := new(MasterServer)
+	// Generate a random port for the client
+	rand.Seed(time.Now().UTC().UnixNano())
+	max := 50005
+	min := 50000
+
+	portNum := rand.Intn(max-min) + min
+	port = strconv.Itoa(portNum)
+
+	go serveClients()
+
+	/*master := new(MasterServer)
 	// Publish the receiver methods
 	err := rpc.Register(master)
+	errorHandler(err)
+	go serveClients()*/
+	for {
+	}
+}
+
+func serveClients() {
+	addr, err := net.ResolveTCPAddr(network, "0.0.0.0:"+port)
 	errorHandler(err)
 
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 1234
-	listener, err := net.Listen(network, addressLocal)
+	listen, err := net.ListenTCP(network, addr)
 	errorHandler(err)
-	log.Printf("Serving RPC server on port %d", 1234)
+	log.Printf("Serving RPC server on address %s , port %s", addr, port)
 
-	// serve the client TODO multiple clients
-	err = http.Serve(listener, nil)
-	errorHandler(err)
+	// create new listener
+	//listener := new(net.Listener)
+	//rpc.Register(listener)
+	//log.Printf("Create new listener")
 
+	for {
+		// serve the new client
+		err = http.Serve(listen, nil)
+		log.Printf("Serving the client.")
+		errorHandler(err)
+	}
 }
 
 /*------------------ LOCAL FUNCTIONS -------------------------------------------------------*/

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/rpc"
 	"os"
+	"strconv"
 )
 
 type GrepArgs struct {
@@ -21,7 +23,7 @@ type File struct {
 
 const (
 	network  = "tcp"
-	address  = "localhost:1234"
+	address  = "localhost"
 	service1 = "MasterServer.Grep"
 
 	filename = "client/test.txt"
@@ -31,16 +33,34 @@ const (
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
 	var reply File
+	var cli *rpc.Client
 
-	//create a TCP connection to localhost on port 1234
-	cli, err := rpc.DialHTTP(network, address)
-	errorHandler(err)
+	// check for open TCP ports
+	for p := 50000; p <= 50005; p++ {
+		port := strconv.Itoa(p)
+		cli, err := rpc.Dial(network, net.JoinHostPort(address, port))
+		if err != nil {
+			log.Printf("Connection error: port %v is not active", p)
+			continue
+		}
+		if cli != nil {
+			//create a TCP connection to localhost
+			defer cli.Close()
+			net.JoinHostPort(address, port)
+			log.Printf("Connected on port %v", p)
+			break
+		}
+	}
 
+	// call the service
 	mArgs := prepareArguments(filename, regex)
-
+	fmt.Println(mArgs)
 	// request to grep file to the server
-	err = cli.Call(service1, mArgs, &reply)
-	errorHandler(err)
+	cliCall := cli.Go(service1, mArgs, &reply, nil)
+	repCall := <-cliCall.Done
+	if repCall != nil {
+		log.Println("Done")
+	}
 
 	log.Println(reply)
 }
