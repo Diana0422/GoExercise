@@ -34,18 +34,17 @@ type Worker int
 // Grep /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
 func (w *Worker) Grep(payload []byte, result *[]byte) error {
 
-	log.Printf("Received: %v", string(payload))
+	//log.Printf("Received: %v", string(payload))
 	var inArgs GrepArgs
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err, 42)
 
-	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
-		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
 	mapRes := mapGrep(inArgs.File, inArgs.Regex)
-	log.Printf("MapRes: %v", mapRes)
+	//log.Printf("MapRes: %v", mapRes)
 
 	// Marshaling
 	s, err := json.Marshal(&mapRes)
@@ -87,7 +86,7 @@ func mapGrep(chunk File, regex string) []MapResp {
 		}
 	}
 
-	log.Println(res)
+	//log.Println(res)
 	return res
 }
 

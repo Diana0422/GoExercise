@@ -68,8 +68,7 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 
 	//prepare results
 	grepChan := make([]*rpc.Call, mc.numWorkers)
-	grepResp := make([]byte, mc.numWorkers)
-	//log.Printf("grepResp: %v", grepResp)
+	grepResp := make([][]byte, mc.numWorkers)
 
 	//SEND CHUNKS TO WORKERS
 	for i, chunk := range chunks {
@@ -80,7 +79,8 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 		mArgs := prepareArguments(chunk, regex)
 
 		//spawn worker connections
-		grepChan[i] = cli.Go(service2, mArgs, grepResp[i], nil)
+		grepChan[i] = cli.Go(service2, mArgs, &grepResp[i], nil)
+
 		log.Printf("Spawned worker connection #%d", i)
 	}
 
@@ -92,8 +92,8 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 
 	//merge results
 	log.Println("Merging results...")
-	log.Printf("grepResp: %v", grepResp)
-	reply, err := mergeMapResults(grepResp)
+	//log.Printf("grepResp: %v", grepResp)
+	reply, err := mergeMapResults(grepResp, mc.numWorkers)
 	return reply, err
 }
 
@@ -197,23 +197,26 @@ func prepareArguments(chunk File, regex string) interface{} {
 	return mArgs
 }
 
-func mergeMapResults(resp []byte) (*File, error) {
+func mergeMapResults(resp [][]byte, dim int) (*File, error) {
 	file := new(File)
 	file.Name = "result.txt"
 
-	log.Printf("Received: %v", string(resp))
-	var outArgs []GrepResp
+	for i := 0; i < dim; i++ {
+		// Unmarshalling
+		//log.Printf("Received: %s", resp[i])
+		var outArgs []GrepResp
 
-	// Unmarshalling
-	err := json.Unmarshal(resp, &outArgs)
-	errorHandler(err, 202)
+		err := json.Unmarshal(resp[i], &outArgs)
+		errorHandler(err, 202)
 
-	log.Printf("Unmarshal: Key: %v", outArgs)
+		//log.Printf("Unmarshal: Key: %v", outArgs)
 
-	for j := 0; j < len(outArgs); j++ {
-		file.Content += outArgs[j].Key
+		for j := 0; j < len(outArgs); j++ {
+			file.Content += outArgs[j].Key + "\n"
+		}
 	}
 
+	log.Printf("Result file content: %s\n", file.Content)
 	return file, nil
 }
 
