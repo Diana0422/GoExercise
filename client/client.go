@@ -29,7 +29,7 @@ const (
 
 /*------------------ MAIN -------------------------------------------------------*/
 func main() {
-	reply := new(File)
+	var reply []byte
 	var cli *rpc.Client
 	var err error
 
@@ -62,9 +62,15 @@ func main() {
 	repCall := <-cliCall.Done
 	log.Printf("Done %v", repCall)
 
-	//TODO Unmarshalling of reply
-	log.Println(reply)
-	cli.Close()
+	// Unmarshalling of reply
+	var result File
+	err = json.Unmarshal(reply, &result)
+	errorHandler(err, 67)
+
+	fmt.Println("Grep result: ")
+	fmt.Println(result.Content)
+	err = cli.Close()
+	errorHandler(err, 72)
 }
 
 func prepareArguments() []byte {
@@ -81,7 +87,7 @@ func prepareArguments() []byte {
 
 	// Marshaling
 	s, err := json.Marshal(&grepRequest)
-	errorHandler(err, 84)
+	errorHandler(err, 89)
 	log.Printf("Marshaled Data: %s", s)
 
 	return s
@@ -95,7 +101,7 @@ func fileToGrep() string {
 
 	// Read files directory
 	file, err := ioutil.ReadDir("client/files")
-	errorHandler(err, 94)
+	errorHandler(err, 103)
 
 	for i := 0; i < len(file); i++ {
 		fmt.Printf("-> (%d) %s\n", i+1, file[i].Name())
@@ -104,7 +110,8 @@ func fileToGrep() string {
 
 	// Input the file chosen
 	fmt.Print("Select a number: ")
-	fmt.Scanf("%d\n", &fileNum)
+	_, err = fmt.Scanf("%d\n", &fileNum)
+	errorHandler(err, 113)
 	return fileMap[fileNum]
 }
 
@@ -112,7 +119,8 @@ func getRegex() string {
 	var regex string
 	// Input the regex
 	fmt.Print("Select a regex: ")
-	fmt.Scanf("%s\n", &regex)
+	_, err := fmt.Scanf("%s\n", &regex)
+	errorHandler(err, 122)
 	return regex
 }
 
@@ -127,7 +135,7 @@ func readFileContent(filename string) string {
 	//read file content
 	log.Printf("Reading file: %s", filename)
 	content, err := ioutil.ReadFile(filename)
-	errorHandler(err, 103)
+	errorHandler(err, 137)
 	return string(content)
 }
 

@@ -39,7 +39,7 @@ func (w *Worker) Grep(payload []byte, result *[]byte) error {
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
-	errorHandler(err, 42)
+	errorHandler(err, 41)
 
 	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
@@ -61,17 +61,17 @@ func main() {
 	worker := new(Worker)
 	// Publish the receiver methods
 	err := rpc.Register(worker)
-	errorHandler(err, 57)
+	errorHandler(err, 63)
 
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 5678
 	listener, err := net.Listen(network, addressLocal)
-	errorHandler(err, 63)
+	errorHandler(err, 69)
 	log.Printf("Serving RPC server on port %d", 5678)
 
 	err = http.Serve(listener, nil)
-	errorHandler(err, 67)
+	errorHandler(err, 73)
 }
 
 // MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]

@@ -42,19 +42,26 @@ type MasterClient struct {
 }
 
 // Grep /*---------- REMOTE PROCEDURE - CLIENT SIDE ---------------------------------------*/
-func (m *MasterServer) Grep(payload []byte, reply *File) error {
+func (m *MasterServer) Grep(payload []byte, reply *[]byte) error {
 	//log.Printf("Received: %v", string(payload))
 	var inArgs GrepRequest
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
-	errorHandler(err, 51)
+	errorHandler(err, 50)
 
 	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
 	//inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
 	master := new(MasterClient)
-	reply, err = master.Grep(inArgs.File, inArgs.Regex)
+	result, err := master.Grep(inArgs.File, inArgs.Regex)
+	errorHandler(err, 57)
+
+	// Marshalling
+	s, err := json.Marshal(&result)
+	log.Printf("Marshaled Data: %s", s)
+
+	*reply = s
 
 	return err
 }
@@ -74,7 +81,7 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 	for i, chunk := range chunks {
 		//create a TCP connection to localhost on port 5678
 		cli, err := rpc.DialHTTP(network, address)
-		errorHandler(err, 77)
+		errorHandler(err, 83)
 
 		mArgs := prepareArguments(chunk, regex)
 
@@ -94,6 +101,9 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 	log.Println("Merging results...")
 	//log.Printf("grepResp: %v", grepResp)
 	reply, err := mergeMapResults(grepResp, mc.numWorkers)
+
+	//TODO shuffle and sort + reduce function
+
 	return reply, err
 }
 
@@ -112,7 +122,7 @@ func main() {
 	master := new(MasterServer)
 	// Publish the receiver methods
 	err := rpc.Register(master)
-	errorHandler(err, 110)
+	errorHandler(err, 124)
 
 	for {
 	}
@@ -120,13 +130,13 @@ func main() {
 
 func serveClients() {
 	addr, err := net.ResolveTCPAddr(network, "0.0.0.0:"+port)
-	errorHandler(err, 117)
+	errorHandler(err, 132)
 
 	// Register a HTTP handler
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 1234
 	listen, err := net.ListenTCP(network, addr)
-	errorHandler(err, 123)
+	errorHandler(err, 138)
 	log.Printf("Serving RPC server on address %s , port %s", addr, port)
 
 	for {
@@ -157,7 +167,7 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 		linesPerWorker = maxLoad
 	}
 
-	//log.Printf("lines per worker %d\nnumber of workers %d\n", linesPerWorker, mc.numWorkers)
+	//log.Printf("lines per worker %d\n number of workers %d\n", linesPerWorker, mc.numWorkers)
 
 	//create and populate chunk buffer
 	chunks := make([]File, mc.numWorkers)
@@ -191,7 +201,7 @@ func prepareArguments(chunk File, regex string) interface{} {
 
 	// Marshaling
 	mArgs, err := json.Marshal(&grepArgs)
-	errorHandler(err, 185)
+	errorHandler(err, 203)
 	log.Printf("Marshaled Data: %s", mArgs)
 
 	return mArgs
@@ -207,7 +217,7 @@ func mergeMapResults(resp [][]byte, dim int) (*File, error) {
 		var outArgs []GrepResp
 
 		err := json.Unmarshal(resp[i], &outArgs)
-		errorHandler(err, 202)
+		errorHandler(err, 219)
 
 		//log.Printf("Unmarshal: Key: %v", outArgs)
 
