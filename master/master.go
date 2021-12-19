@@ -43,15 +43,15 @@ type MasterClient struct {
 
 // Grep /*---------- REMOTE PROCEDURE - CLIENT SIDE ---------------------------------------*/
 func (m *MasterServer) Grep(payload []byte, reply *File) error {
-	log.Printf("Received: %v", string(payload))
+	//log.Printf("Received: %v", string(payload))
 	var inArgs GrepRequest
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err, 51)
 
-	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
-		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
+	//inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
 	master := new(MasterClient)
 	reply, err = master.Grep(inArgs.File, inArgs.Regex)
@@ -64,12 +64,12 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 	// chunk the file using getChunks function
 	var chunks []File
 	chunks = getChunks(srcFile, mc)
-	log.Println(chunks) // just for now
+	//log.Println(chunks)
 
 	//prepare results
 	grepChan := make([]*rpc.Call, mc.numWorkers)
 	grepResp := make([]byte, mc.numWorkers)
-	log.Printf("grepResp: %v", grepResp)
+	//log.Printf("grepResp: %v", grepResp)
 
 	//SEND CHUNKS TO WORKERS
 	for i, chunk := range chunks {
@@ -142,6 +142,7 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 	//Separate the content of the original file in lines
 	lines := strings.Split(srcFile.Content, "\n")
 	numLines := len(lines)
+	//log.Printf("TOTAL LINES %d\n", numLines)
 
 	//Distribute equal amount of lines per chunk
 	var linesPerWorker int
@@ -156,6 +157,8 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 		linesPerWorker = maxLoad
 	}
 
+	//log.Printf("lines per worker %d\nnumber of workers %d\n", linesPerWorker, mc.numWorkers)
+
 	//create and populate chunk buffer
 	chunks := make([]File, mc.numWorkers)
 	currLine := 0
@@ -165,12 +168,13 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 		chunk.Name = "chunk" + strconv.Itoa(i) + ".txt"
 
 		//write 'linesPerWorker' lines from src to chunk
-		if i == mc.numWorkers-1 && i != 0 {
+		if i == mc.numWorkers-1 && i != 0 && numLines%maxLoad != 0 {
 			linesPerWorker = numLines % maxLoad
 		}
 
 		for j := 0; j < linesPerWorker; j++ {
-			chunk.Content += lines[currLine]
+			chunk.Content += lines[currLine] + "\n"
+			//log.Printf("Worker %d, Line %d\nContent: %s\n", i, j+1, chunk.Content)
 			currLine++
 		}
 		chunks[i] = *chunk

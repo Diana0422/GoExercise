@@ -55,13 +55,14 @@ func main() {
 	fmt.Println(mArgs)
 	// request to grep file to the server
 	log.Printf("service: %v", service1)
-	log.Printf("args: %v", mArgs)
+	log.Printf("args: %v", string(mArgs))
 	log.Printf("reply: %p", &reply)
 	log.Printf("client: %p", cli)
 	cliCall := cli.Go(service1, mArgs, &reply, nil)
 	repCall := <-cliCall.Done
 	log.Printf("Done %v", repCall)
 
+	//TODO Unmarshalling of reply
 	log.Println(reply)
 	cli.Close()
 }
