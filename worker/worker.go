@@ -15,7 +15,7 @@ const (
 	addressLocal = "localhost:5678"
 )
 
-type GrepArgs struct {
+type MapArgs struct {
 	File  File
 	Regex []string
 }
@@ -32,28 +32,46 @@ type MapResp struct {
 
 type Worker int
 
-// Grep /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
-func (w *Worker) Grep(payload []byte, result *[]byte) error {
+// Map /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
+func (w *Worker) Map(payload []byte, result *[]byte) error {
 
 	//log.Printf("Received: %v", string(payload))
-	var inArgs GrepArgs
+	var inArgs MapArgs
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err, 41)
-
 	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
-	mapRes := mapGrep(inArgs.File, inArgs.Regex)
+	//map
+	var mapRes []MapResp
+	chunk := inArgs.File
+	regex := inArgs.Regex
+	lines := strings.Split(chunk.Content, "\n")
+	for _, line := range lines {
+		for i := 0; i < len(regex); i++ {
+			match, err := regexp.Match(regex[i], []byte(line))
+			errorHandler(err, 86)
+			if match {
+				mapRes = append(mapRes, MapResp{regex[i], line})
+			}
+		}
+	}
 	//log.Printf("MapRes: %v", mapRes)
 
-	// Marshaling
+	// Marshalling
 	s, err := json.Marshal(&mapRes)
 	errorHandler(err, 50)
 	log.Printf("Marshaled Data: %s", s)
 
+	//return
 	*result = s
+	return nil
+}
 
+// Reduce -> identity /*---------- REMOTE PROCEDURE - MASTER SIDE --------------*/
+func (w *Worker) Reduce(payload []byte, result *[]byte) error {
+	*result = payload
 	return nil
 }
 
@@ -73,26 +91,6 @@ func main() {
 
 	err = http.Serve(listener, nil)
 	errorHandler(err, 73)
-}
-
-// MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
-func mapGrep(chunk File, regex []string) []MapResp {
-
-	res := make([]MapResp, 0)
-
-	lines := strings.Split(chunk.Content, "\n")
-	for _, line := range lines {
-		for i := 0; i < len(regex); i++ {
-			match, err := regexp.Match(regex[i], []byte(line))
-			errorHandler(err, 86)
-			if match {
-				res = append(res, MapResp{regex[i], line})
-			}
-		}
-	}
-
-	//log.Println(res)
-	return res
 }
 
 //error handling
