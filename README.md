@@ -20,6 +20,10 @@ go run client/client.go
 
 ### Run the master:
 ````
-go run server/master/main.go
+go run master/master.go
 ````
 
+### Run the worker:
+````
+go run worker/worker.go
+````

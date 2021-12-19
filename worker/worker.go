@@ -45,10 +45,11 @@ func (w *Worker) Grep(payload []byte, result *[]byte) error {
 		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
 	mapRes := mapGrep(inArgs.File, inArgs.Regex)
+	log.Printf("MapRes: %v", mapRes)
 
 	// Marshaling
 	s, err := json.Marshal(&mapRes)
-	errorHandler(err)
+	errorHandler(err, 50)
 	log.Printf("Marshaled Data: %s", s)
 
 	*result = s

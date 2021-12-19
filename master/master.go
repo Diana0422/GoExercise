@@ -69,6 +69,7 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 	//prepare results
 	grepChan := make([]*rpc.Call, mc.numWorkers)
 	grepResp := make([]byte, mc.numWorkers)
+	log.Printf("grepResp: %v", grepResp)
 
 	//SEND CHUNKS TO WORKERS
 	for i, chunk := range chunks {
@@ -80,14 +81,18 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 
 		//spawn worker connections
 		grepChan[i] = cli.Go(service2, mArgs, grepResp[i], nil)
+		log.Printf("Spawned worker connection #%d", i)
 	}
 
 	//wait for response
 	for i := 0; i < mc.numWorkers; i++ {
 		<-grepChan[i].Done
+		log.Printf("Worker #%d DONE", i)
 	}
 
 	//merge results
+	log.Println("Merging results...")
+	log.Printf("grepResp: %v", grepResp)
 	reply, err := mergeMapResults(grepResp)
 	return reply, err
 }
@@ -197,7 +202,7 @@ func mergeMapResults(resp []byte) (*File, error) {
 
 	// Unmarshalling
 	err := json.Unmarshal(resp, &outArgs)
-	errorHandler(err)
+	errorHandler(err, 202)
 
 	log.Printf("Unmarshal: Key: %v", outArgs)
 

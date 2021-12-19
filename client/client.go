@@ -25,9 +25,6 @@ const (
 	network  = "tcp"
 	address  = "localhost"
 	service1 = "MasterServer.Grep"
-
-	filename = "client/test.txt"
-	regex    = "is"
 )
 
 /*------------------ MAIN -------------------------------------------------------*/
@@ -54,7 +51,7 @@ func main() {
 	}
 
 	// call the service
-	mArgs := prepareArguments(filename, regex)
+	mArgs := prepareArguments()
 	fmt.Println(mArgs)
 	// request to grep file to the server
 	log.Printf("service: %v", service1)
@@ -69,11 +66,12 @@ func main() {
 	cli.Close()
 }
 
-func prepareArguments(f string, r string) []byte {
+func prepareArguments() []byte {
 	// retrieve file to grep TODO better: choose your file
 	file := new(File)
-	file.Name = filename
-	file.Content = readFileContent(filename)
+	file.Name = fileToGrep()
+	regex := getRegex()
+	file.Content = readFileContent("client/files/" + file.Name)
 	log.Printf("File Content: %s", file.Content)
 
 	grepRequest := new(GrepRequest)
@@ -89,6 +87,34 @@ func prepareArguments(f string, r string) []byte {
 }
 
 /*------------------ OTHER FUNCTIONS -------------------------------------------------------*/
+func fileToGrep() string {
+	var fileNum int
+	fileMap := make(map[int]string)
+	fmt.Println("\n\nChoose a file to grep:")
+
+	// Read files directory
+	file, err := ioutil.ReadDir("client/files")
+	errorHandler(err, 94)
+
+	for i := 0; i < len(file); i++ {
+		fmt.Printf("-> (%d) %s\n", i+1, file[i].Name())
+		fileMap[i+1] = file[i].Name()
+	}
+
+	// Input the file chosen
+	fmt.Print("Select a number: ")
+	fmt.Scanf("%d\n", &fileNum)
+	return fileMap[fileNum]
+}
+
+func getRegex() string {
+	var regex string
+	// Input the regex
+	fmt.Print("Select a regex: ")
+	fmt.Scanf("%s\n", &regex)
+	return regex
+}
+
 func readFileContent(filename string) string {
 	//open file
 	f, err := os.Open(filename)
