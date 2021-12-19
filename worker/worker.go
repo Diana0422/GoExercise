@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"encoding/json"
 	"log"
 	"net"
@@ -16,7 +15,7 @@ const (
 )
 
 type GrepArgs struct {
-	Chunk File
+	File  File
 	Regex string
 }
 
@@ -33,7 +32,7 @@ type MapResp struct {
 type Worker int
 
 // Grep /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
-func (w *Worker) Grep(payload []byte, mapRes *list.List) error {
+func (w *Worker) Grep(payload []byte, result *[]byte) error {
 
 	log.Printf("Received: %v", string(payload))
 	var inArgs GrepArgs
@@ -43,9 +42,16 @@ func (w *Worker) Grep(payload []byte, mapRes *list.List) error {
 	errorHandler(err, 42)
 
 	log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
-		inArgs.Chunk.Name, inArgs.Chunk.Content, inArgs.Regex)
+		inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
 
-	mapRes = mapGrep(inArgs.Chunk, inArgs.Regex)
+	mapRes := mapGrep(inArgs.File, inArgs.Regex)
+
+	// Marshaling
+	s, err := json.Marshal(&mapRes)
+	errorHandler(err)
+	log.Printf("Marshaled Data: %s", s)
+
+	*result = s
 
 	return nil
 }
@@ -69,17 +75,18 @@ func main() {
 }
 
 // MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
-func mapGrep(chunk File, regex string) *list.List {
+func mapGrep(chunk File, regex string) []MapResp {
 
-	res := new(list.List)
+	res := make([]MapResp, 0)
+
 	lines := strings.Split(chunk.Content, "\n")
-
 	for _, line := range lines {
-		if strings.Contains(regex, line) {
-			res.PushBack(MapResp{line, true})
+		if strings.Contains(line, regex) {
+			res = append(res, MapResp{line, true})
 		}
 	}
 
+	log.Println(res)
 	return res
 }
 

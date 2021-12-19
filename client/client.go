@@ -27,7 +27,7 @@ const (
 	service1 = "MasterServer.Grep"
 
 	filename = "client/test.txt"
-	regex    = "ciao"
+	regex    = "is"
 )
 
 /*------------------ MAIN -------------------------------------------------------*/

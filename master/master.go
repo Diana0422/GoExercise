@@ -12,11 +12,10 @@ import (
 )
 
 const (
-	network      = "tcp"
-	addressLocal = "localhost:1234"
-	address      = "localhost:5678"
-	service2     = "Worker.Grep"
-	maxLoad      = 10 //every worker operates on a maximum of 'maxLoad' lines
+	network  = "tcp"
+	address  = "localhost:5678"
+	service2 = "Worker.Grep"
+	maxLoad  = 10 //every worker operates on a maximum of 'maxLoad' lines
 )
 
 var port string
@@ -69,7 +68,7 @@ func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
 
 	//prepare results
 	grepChan := make([]*rpc.Call, mc.numWorkers)
-	grepResp := make([]GrepResp, mc.numWorkers)
+	grepResp := make([]byte, mc.numWorkers)
 
 	//SEND CHUNKS TO WORKERS
 	for i, chunk := range chunks {
@@ -189,12 +188,21 @@ func prepareArguments(chunk File, regex string) interface{} {
 	return mArgs
 }
 
-func mergeMapResults(resp []GrepResp) (*File, error) {
+func mergeMapResults(resp []byte) (*File, error) {
 	file := new(File)
 	file.Name = "result.txt"
 
-	for _, result := range resp {
-		file.Content += result.Key
+	log.Printf("Received: %v", string(resp))
+	var outArgs []GrepResp
+
+	// Unmarshalling
+	err := json.Unmarshal(resp, &outArgs)
+	errorHandler(err)
+
+	log.Printf("Unmarshal: Key: %v", outArgs)
+
+	for j := 0; j < len(outArgs); j++ {
+		file.Content += outArgs[j].Key
 	}
 
 	return file, nil
