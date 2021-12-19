@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/rpc"
+	"regexp"
 	"strings"
 )
 
@@ -16,7 +17,7 @@ const (
 
 type GrepArgs struct {
 	File  File
-	Regex string
+	Regex []string
 }
 
 type File struct {
@@ -26,7 +27,7 @@ type File struct {
 
 type MapResp struct {
 	Key   string
-	Value bool
+	Value string
 }
 
 type Worker int
@@ -75,14 +76,18 @@ func main() {
 }
 
 // MAP -> input (key=chunk, val=regex) => output [(key=str, val=regexIsIn)]
-func mapGrep(chunk File, regex string) []MapResp {
+func mapGrep(chunk File, regex []string) []MapResp {
 
 	res := make([]MapResp, 0)
 
 	lines := strings.Split(chunk.Content, "\n")
 	for _, line := range lines {
-		if strings.Contains(line, regex) {
-			res = append(res, MapResp{line, true})
+		for i := 0; i < len(regex); i++ {
+			match, err := regexp.Match(regex[i], []byte(line))
+			errorHandler(err, 86)
+			if match {
+				res = append(res, MapResp{regex[i], line})
+			}
 		}
 	}
 

@@ -22,12 +22,12 @@ var port string
 
 type GrepResp struct {
 	Key   string
-	Value bool
+	Value string
 }
 
 type GrepRequest struct {
 	File  File
-	Regex string
+	Regex []string
 }
 
 type File struct {
@@ -67,7 +67,7 @@ func (m *MasterServer) Grep(payload []byte, reply *[]byte) error {
 }
 
 // Grep /*---------- REMOTE PROCEDURE - WORKER SIDE ---------------------------------------*/
-func (mc *MasterClient) Grep(srcFile File, regex string) (*File, error) {
+func (mc *MasterClient) Grep(srcFile File, regex []string) (*File, error) {
 	// chunk the file using getChunks function
 	var chunks []File
 	chunks = getChunks(srcFile, mc)
@@ -193,7 +193,7 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 	return chunks
 }
 
-func prepareArguments(chunk File, regex string) interface{} {
+func prepareArguments(chunk File, regex []string) interface{} {
 	// Arguments
 	grepArgs := new(GrepRequest)
 	grepArgs.Regex = regex
@@ -222,7 +222,7 @@ func mergeMapResults(resp [][]byte, dim int) (*File, error) {
 		//log.Printf("Unmarshal: Key: %v", outArgs)
 
 		for j := 0; j < len(outArgs); j++ {
-			file.Content += outArgs[j].Key + "\n"
+			file.Content += outArgs[j].Value + "\n"
 		}
 	}
 

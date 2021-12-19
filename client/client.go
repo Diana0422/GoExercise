@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,11 +10,12 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type GrepRequest struct {
 	File  File
-	Regex string
+	Regex []string
 }
 
 type File struct {
@@ -115,12 +117,16 @@ func fileToGrep() string {
 	return fileMap[fileNum]
 }
 
-func getRegex() string {
-	var regex string
+func getRegex() []string {
+	var regex []string
+
 	// Input the regex
-	fmt.Print("Select a regex: ")
-	_, err := fmt.Scanf("%s\n", &regex)
-	errorHandler(err, 122)
+	fmt.Println("Insert any regex you want to look for (format: regex1[ regex2...]): ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		regex = strings.Split(scanner.Text(), " ")
+	}
+
 	return regex
 }
 
