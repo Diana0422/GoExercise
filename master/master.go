@@ -84,7 +84,6 @@ func (mc *MasterClient) Grep(srcFile File, regex []string) (*File, error) {
 	log.Println("Shuffle and sort...")
 	mapOutput, err := mergeMapResults(mapResp, mc.numWorkers)
 	reduceInput := shuffleAndSort(mapOutput)
-	log.Printf("SS Data: %s", reduceInput)
 
 	//REDUCE PHASE
 	log.Println("Reduce...")
@@ -114,7 +113,7 @@ func reduceFunction(mc *MasterClient, redIn []ReduceArgs) [][]byte {
 		// Marshaling
 		rArgs, err := json.Marshal(&chunk)
 		errorHandler(err, 203)
-		log.Printf("Marshaled Data: %s", rArgs)
+		log.Printf("Marshalled Data: %s", rArgs)
 
 		//spawn worker connections
 		grepChan[i] = cli.Go(reduceService, rArgs, &grepResp[i], nil)
@@ -270,22 +269,24 @@ func shuffleAndSort(mapRes []MapResp) []ReduceArgs {
 	})
 
 	var result []ReduceArgs
-
-	prevKey := ""
 	var currKey string
-	var r ReduceArgs
-	for _, m := range mapRes {
+
+	var r *ReduceArgs
+	for i, m := range mapRes {
 		if currKey != m.Key {
-			if prevKey != "" {
-				result = append(result, r)
+			if i != 0 {
+				result = append(result, *r)
 			}
-			r = *new(ReduceArgs)
-			prevKey = currKey
 			currKey = m.Key
+			r = new(ReduceArgs)
+			r.Key = currKey
+			r.Values = append(r.Values, m.Value)
+		} else {
+			r.Values = append(r.Values, m.Value)
 		}
-		r.Values = append(r.Values, m.Value)
 	}
 
+	result = append(result, *r)
 	return result
 }
 
@@ -314,20 +315,16 @@ func mergeFinalResults(resp [][]byte, dim int) (*File, error) {
 	for i := 0; i < dim; i++ {
 		// Unmarshalling
 		//log.Printf("Received: %s", resp[i])
-		var outArgs []ReduceArgs
+		var outArgs ReduceArgs
 
 		err := json.Unmarshal(resp[i], &outArgs)
 		errorHandler(err, 219)
 
 		//log.Printf("Unmarshal: Key: %v", outArgs)
-		for j := 0; j < len(outArgs); j++ {
-			for k := 0; k < len(outArgs[j].Values); k++ {
-				file.Content += outArgs[j].Values[k] + "\n"
-			}
+		for k := 0; k < len(outArgs.Values); k++ {
+			file.Content += outArgs.Values[k] + "\n"
 		}
 	}
-
-	log.Printf("Result file content: %s\n", file.Content)
 	return file, nil
 }
 
