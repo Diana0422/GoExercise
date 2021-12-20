@@ -53,10 +53,14 @@ Once the file is chosen, the master splits its content in multiple chunks. Each 
 distributed to a different worker. The master spawns N workers and the number N of workers is
 determined equally distributing the total lines of the files, such that workers processes
 a maximum of 10 lines each.
-Each worker performs the map phase on the chunk of the file received by the master, then
-returns the result of the mapping to the master, that proceeds performing the following operations:
-* Shuffle
-* Sort
+Each worker performs the following operations on the chunk of the file received by the master:
+* Map
+
+Then each worker returns the result of the mapping to the master, that proceeds performing the following operations:
+* Shuffle & Sort
+
+The master then spawns one or more workers that perform the following operation:
 * Reduce
 
-The master merges the results obtained by the workers and returns the subset of lines to the client.
+The master receives the results from the workers and merges the results obtained.
+Finally, it returns the subset of lines to the client.
