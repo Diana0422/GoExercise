@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	debug        = false
 	network      = "tcp"
 	addressLocal = "localhost:5678"
 )
@@ -34,14 +35,15 @@ type Worker int
 
 // Map /*---------- REMOTE PROCEDURE - MASTER SIDE ---------------------------------------*/
 func (w *Worker) Map(payload []byte, result *[]byte) error {
-
-	//log.Printf("Received: %v", string(payload))
 	var inArgs MapArgs
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
 	errorHandler(err, 41)
-	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	if debug {
+		log.Printf("Received: %v", string(payload))
+		log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s", inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	}
 
 	//map
 	var mapRes []MapResp
@@ -57,12 +59,15 @@ func (w *Worker) Map(payload []byte, result *[]byte) error {
 			}
 		}
 	}
-	//log.Printf("MapRes: %v", mapRes)
+	log.Printf("--> Working on map: %s\n", chunk.Name)
 
 	// Marshalling
 	s, err := json.Marshal(&mapRes)
 	errorHandler(err, 50)
-	log.Printf("Marshaled Data: %s", s)
+	if debug {
+		log.Printf("MapRes: %v", mapRes)
+		log.Printf("Marshaled Data: %s", s)
+	}
 
 	//return
 	*result = s
@@ -71,6 +76,7 @@ func (w *Worker) Map(payload []byte, result *[]byte) error {
 
 // Reduce -> identity /*---------- REMOTE PROCEDURE - MASTER SIDE --------------*/
 func (w *Worker) Reduce(payload []byte, result *[]byte) error {
+	log.Println("--> Working on reduce")
 	*result = payload
 	return nil
 }

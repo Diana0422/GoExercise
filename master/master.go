@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	debug         = false
 	network       = "tcp"
 	address       = "localhost:5678"
 	mapService    = "Worker.Map"
@@ -55,43 +56,51 @@ func (m *MasterServer) Grep(payload []byte, reply *[]byte) error {
 
 	// Unmarshalling
 	err := json.Unmarshal(payload, &inArgs)
-	errorHandler(err, 50)
+	errorHandler(err, 57)
 
-	//log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
-	//inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	if debug {
+		log.Printf("Unmarshal: Name: %s, Content: %s, Regex: %s",
+			inArgs.File.Name, inArgs.File.Content, inArgs.Regex)
+	}
 
 	master := new(MasterClient)
 	result, err := master.Grep(inArgs.File, inArgs.Regex)
-	errorHandler(err, 57)
+	errorHandler(err, 64)
 
 	// Marshalling
 	s, err := json.Marshal(&result)
-	//log.Printf("Marshaled Data: %s", s)
+	if debug {
+		log.Printf("Marshaled Data: %s", s)
+	}
 
 	*reply = s
-
 	return err
 }
 
 // Grep /*---------- REMOTE PROCEDURE - WORKER SIDE ---------------------------------------*/
 func (mc *MasterClient) Grep(srcFile File, regex []string) (*File, error) {
 	//MAP PHASE
-	log.Println("Map...")
+	log.Println("-->Activate Map Service on workers...")
 	mapResp := mapFunction(mc, srcFile, regex)
-	log.Printf("Map Data: %s", mapResp)
+	log.Print("...Done: All the workers returned from map -->\n\n")
 
 	//SHUFFLE AND SORT PHASE
-	log.Println("Shuffle and sort...")
+	log.Println("-->Do Shuffle and sort...")
 	mapOutput, err := mergeMapResults(mapResp, mc.numWorkers)
 	reduceInput := shuffleAndSort(mapOutput)
+	log.Print("...Done: Shuffle and sort -->\n\n")
 
 	//REDUCE PHASE
-	log.Println("Reduce...")
+	log.Println("-->Activate Reduce Service on workers...")
 	redResp := reduceFunction(mc, reduceInput)
-	log.Printf("Reduced Data: %s", redResp)
+	log.Print("...Done: All the workers returned from reduce -->\n\n")
 
 	reply, err := mergeFinalResults(redResp, mc.numWorkers)
-	log.Printf("Reply: %s", reply)
+	if debug {
+		log.Printf("Map Data: %s", mapResp)
+		log.Printf("Reduced Data: %s", redResp)
+		log.Printf("Reply: %s", reply)
+	}
 
 	return reply, err
 }
@@ -108,12 +117,14 @@ func reduceFunction(mc *MasterClient, redIn []ReduceArgs) [][]byte {
 	for i, chunk := range redIn {
 		//create a TCP connection to localhost on port 5678
 		cli, err := rpc.DialHTTP(network, address)
-		errorHandler(err, 83)
+		errorHandler(err, 110)
 
 		// Marshaling
 		rArgs, err := json.Marshal(&chunk)
-		errorHandler(err, 203)
-		log.Printf("Marshalled Data: %s", rArgs)
+		errorHandler(err, 114)
+		if debug {
+			log.Printf("Marshalled Data: %s", rArgs)
+		}
 
 		//spawn worker connections
 		grepChan[i] = cli.Go(reduceService, rArgs, &grepResp[i], nil)
@@ -134,7 +145,6 @@ func mapFunction(mc *MasterClient, srcFile File, regex []string) [][]byte {
 	// chunk the file using getChunks function
 	var chunks []File
 	chunks = getChunks(srcFile, mc)
-	//log.Println(chunks)
 
 	//prepare results
 	grepChan := make([]*rpc.Call, mc.numWorkers)
@@ -144,7 +154,7 @@ func mapFunction(mc *MasterClient, srcFile File, regex []string) [][]byte {
 	for i, chunk := range chunks {
 		//create a TCP connection to localhost on port 5678
 		cli, err := rpc.DialHTTP(network, address)
-		errorHandler(err, 83)
+		errorHandler(err, 146)
 
 		mArgs := prepareMapArguments(chunk, regex)
 
@@ -157,7 +167,7 @@ func mapFunction(mc *MasterClient, srcFile File, regex []string) [][]byte {
 	//wait for response
 	for i := 0; i < mc.numWorkers; i++ {
 		<-grepChan[i].Done
-		log.Printf("Worker #%d DONE", i)
+		log.Printf("Done: Worker #%d\n", i)
 	}
 
 	return grepResp
@@ -178,7 +188,7 @@ func main() {
 	master := new(MasterServer)
 	// Publish the receiver methods
 	err := rpc.Register(master)
-	errorHandler(err, 124)
+	errorHandler(err, 180)
 
 	for {
 	}
@@ -192,13 +202,12 @@ func serveClients() {
 	rpc.HandleHTTP()
 	//Listen to TCP connections on port 1234
 	listen, err := net.ListenTCP(network, addr)
-	errorHandler(err, 138)
-	log.Printf("Serving RPC server on address %s , port %s", addr, port)
+	errorHandler(err, 194)
+	log.Printf("Serving RPC server on address %s , port %s\n", addr, port)
 
 	for {
 		// serve the new client
 		rpc.Accept(listen)
-		log.Printf("Serving the client.")
 	}
 }
 
@@ -208,7 +217,6 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 	//Separate the content of the original file in lines
 	lines := strings.Split(srcFile.Content, "\n")
 	numLines := len(lines)
-	//log.Printf("TOTAL LINES %d\n", numLines)
 
 	//Distribute equal amount of lines per chunk
 	var linesPerWorker int
@@ -222,8 +230,6 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 		}
 		linesPerWorker = maxLoad
 	}
-
-	//log.Printf("lines per worker %d\n number of workers %d\n", linesPerWorker, mc.numWorkers)
 
 	//create and populate chunk buffer
 	chunks := make([]File, mc.numWorkers)
@@ -240,7 +246,6 @@ func getChunks(srcFile File, mc *MasterClient) []File {
 
 		for j := 0; j < linesPerWorker; j++ {
 			chunk.Content += lines[currLine] + "\n"
-			//log.Printf("Worker %d, Line %d\nContent: %s\n", i, j+1, chunk.Content)
 			currLine++
 		}
 		chunks[i] = *chunk
@@ -257,8 +262,10 @@ func prepareMapArguments(chunk File, regex []string) interface{} {
 
 	// Marshaling
 	mArgs, err := json.Marshal(&grepArgs)
-	errorHandler(err, 203)
-	log.Printf("Marshaled Data: %s", mArgs)
+	errorHandler(err, 259)
+	if debug {
+		log.Printf("Marshaled Data: %s", mArgs)
+	}
 
 	return mArgs
 }
@@ -296,12 +303,13 @@ func mergeMapResults(resp [][]byte, dim int) ([]MapResp, error) {
 
 	for i := 0; i < dim; i++ {
 		// Unmarshalling
-		//log.Printf("Received: %s", resp[i])
 		var temp []MapResp
 		err := json.Unmarshal(resp[i], &temp)
-		errorHandler(err, 219)
-
-		//log.Printf("Unmarshal: Key: %v", outArgs)
+		errorHandler(err, 301)
+		if debug {
+			log.Printf("Received: %s", resp[i])
+			log.Printf("Unmarshal: Key: %v", temp)
+		}
 		mapRes = append(mapRes, temp...)
 	}
 
@@ -314,13 +322,14 @@ func mergeFinalResults(resp [][]byte, dim int) (*File, error) {
 
 	for i := 0; i < dim; i++ {
 		// Unmarshalling
-		//log.Printf("Received: %s", resp[i])
 		var outArgs ReduceArgs
 
 		err := json.Unmarshal(resp[i], &outArgs)
-		errorHandler(err, 219)
-
-		//log.Printf("Unmarshal: Key: %v", outArgs)
+		errorHandler(err, 320)
+		if debug {
+			log.Printf("Received: %s", resp[i])
+			log.Printf("Unmarshal: Key: %v", outArgs)
+		}
 		for k := 0; k < len(outArgs.Values); k++ {
 			file.Content += outArgs.Values[k] + "\n"
 		}

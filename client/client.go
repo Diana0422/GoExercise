@@ -24,6 +24,7 @@ type File struct {
 }
 
 const (
+	debug    = false // Set to true to activate debug log
 	network  = "tcp"
 	address  = "localhost"
 	service1 = "MasterServer.Grep"
@@ -34,54 +35,69 @@ func main() {
 	var reply []byte
 	var cli *rpc.Client
 	var err error
+	welcome()
 
 	// check for open TCP ports
 	for p := 50000; p <= 50005; p++ {
 		port := strconv.Itoa(p)
 		cli, err = rpc.Dial(network, net.JoinHostPort(address, port))
 		if err != nil {
-			log.Printf("Connection error: port %v is not active", p)
+			if debug {
+				log.Printf("Connection error: port %v is not active", p)
+			}
+			log.Printf("Connecting to master...")
 			continue
 		}
 		if cli != nil {
 			//create a TCP connection to localhost
 			net.JoinHostPort(address, port)
 			log.Printf("Connected on port %v", p)
-			log.Printf("client conn: %p", cli)
+
+			if debug {
+				log.Printf("client conn: %p", cli)
+			}
 			break
 		}
 	}
 
 	// call the service
 	mArgs := prepareArguments()
-	fmt.Println(mArgs)
+
 	// request to grep file to the server
-	log.Printf("service: %v", service1)
-	log.Printf("args: %v", string(mArgs))
-	log.Printf("reply: %p", &reply)
-	log.Printf("client: %p", cli)
+	if debug {
+		log.Printf("service: %v", service1)
+		log.Printf("args: %v", string(mArgs))
+		log.Printf("reply: %p", &reply)
+		log.Printf("client: %p", cli)
+	}
 	cliCall := cli.Go(service1, mArgs, &reply, nil)
 	repCall := <-cliCall.Done
-	log.Printf("Done %v", repCall)
+	if debug {
+		log.Printf("Done %v", repCall)
+	}
 
 	// Unmarshalling of reply
 	var result File
 	err = json.Unmarshal(reply, &result)
-	errorHandler(err, 67)
+	errorHandler(err, 77)
 
-	fmt.Println("Grep result: ")
+	// Print grep result on screen
+	fmt.Println("")
+	fmt.Println("-------------------------- GREP RESULT ------------------------------: ")
 	fmt.Println(result.Content)
 	err = cli.Close()
-	errorHandler(err, 72)
+	errorHandler(err, 84)
 }
 
 func prepareArguments() []byte {
-	// retrieve file to grep TODO better: choose your file
+	// retrieve file to grep
 	file := new(File)
 	file.Name = fileToGrep()
 	regex := getRegex()
 	file.Content = readFileContent("client/files/" + file.Name)
-	log.Printf("File Content: %s", file.Content)
+	if debug {
+		log.Printf("File Content: %s", file.Content)
+	}
 
 	grepRequest := new(GrepRequest)
 	grepRequest.File = *file
@@ -89,8 +105,10 @@ func prepareArguments() []byte {
 
 	// Marshaling
 	s, err := json.Marshal(&grepRequest)
-	errorHandler(err, 89)
-	log.Printf("Marshaled Data: %s", s)
+	errorHandler(err, 102)
+	if debug {
+		log.Printf("Marshaled Data: %s", s)
+	}
 
 	return s
 }
@@ -99,11 +117,12 @@ func prepareArguments() []byte {
 func fileToGrep() string {
 	var fileNum int
 	fileMap := make(map[int]string)
-	fmt.Println("\n\nChoose a file to grep:")
+	fmt.Println("\n----------------------- WELCOME in GoGREP! --------------------------:")
+	fmt.Println("Choose a file to grep:")
 
 	// Read files directory
 	file, err := ioutil.ReadDir("client/files")
-	errorHandler(err, 103)
+	errorHandler(err, 119)
 
 	for i := 0; i < len(file); i++ {
 		fmt.Printf("-> (%d) %s\n", i+1, file[i].Name())
@@ -113,7 +132,7 @@ func fileToGrep() string {
 	// Input the file chosen
 	fmt.Print("Select a number: ")
 	_, err = fmt.Scanf("%d\n", &fileNum)
-	errorHandler(err, 113)
+	errorHandler(err, 129)
 	return fileMap[fileNum]
 }
 
@@ -121,7 +140,7 @@ func getRegex() []string {
 	var regex []string
 
 	// Input the regex
-	fmt.Println("Insert any regex you want to look for (format: regex1[ regex2...]): ")
+	fmt.Print("Insert any regex you want to look for (format: regex1[ regex2...]): ")
 	scanner := bufio.NewScanner(os.Stdin)
 	if scanner.Scan() {
 		regex = strings.Split(scanner.Text(), " ")
@@ -131,22 +150,28 @@ func getRegex() []string {
 }
 
 func readFileContent(filename string) string {
-	//open file
-	f, err := os.Open(filename)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(f.Stat())
-
 	//read file content
-	log.Printf("Reading file: %s", filename)
+	if debug {
+		log.Printf("Reading file: %s", filename)
+	}
 	content, err := ioutil.ReadFile(filename)
-	errorHandler(err, 137)
+	errorHandler(err, 158)
 	return string(content)
 }
 
 func errorHandler(err error, line int) {
 	if err != nil {
 		log.Fatalf("failure at line %d: %v", line, err)
+	}
+}
+
+func welcome() {
+	// Welcome
+	for i := 0; i <= 3; i++ {
+		fmt.Println("*")
+	}
+	fmt.Println("Authors: Diana Pasquali, Livia Simoncini")
+	for i := 0; i <= 3; i++ {
+		fmt.Println("*")
 	}
 }
